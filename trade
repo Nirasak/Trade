@@ -1,0 +1,233 @@
+#!/usr/bin/python3
+
+import sys
+
+class Strat:
+    def __init__(self, symbol, reinvest, profit, wallet, fees, infos):
+        self.symbol = symbol
+        self.values = {}
+        self.volume = 0
+        self.wallet = wallet
+        self.reinvest = reinvest
+        self.profit = profit
+        self.nbReinvest = 0
+        self.nbReinvestMax = 8
+        self.invest = 0
+        self.startInvest = self.wallet / pow(2, self.nbReinvestMax + 1) * (95 / 100)
+        self.averagePrice = 0
+        self.lastPrice = 0
+        self.sens = None
+        self.fees = 1 - fees
+        self.infos = infos
+        self.liquidate = 0
+        self.min = None
+        self.max = None
+        self.volatility = [0, None, 0, 0]
+        self.moy = 0
+        self.volume_bis = 0
+
+    def firstOrder(self):
+        self.volatility[3] = 1
+        self.startInvest = self.wallet / pow(2, self.nbReinvestMax + 1) * (95 / 100)
+        self.invest = self.startInvest
+        self.volume = (self.invest / self.values['close']) * self.fees
+        self.lastPrice = self.values['close']
+        self.averagePrice = self.values['close']
+        return ('buy ' + self.symbol + ' ' + str(self.invest / self.values['close']))
+
+    def checkOrder(self):
+        dest = None
+        if (self.sens is 'UP'):
+            if (self.values['close'] >= self.lastPrice * (1 + self.reinvest) and self.nbReinvest < self.nbReinvestMax):
+                self.nbReinvest += 1
+                self.averagePrice = (self.averagePrice * self.volume + self.values['close'] * ((self.invest * 2) / self.values['close'])) / (self.volume + ((self.invest * 2) / self.values['close']))
+                self.lastPrice = self.values['close']
+                self.invest *= 2
+                dest = 'buy ' + self.symbol + ' ' + str(self.invest / self.values['close'])
+                self.volume += (self.invest / self.values['close']) * self.fees
+                return (dest)
+
+            if (self.nbReinvest == 3 or (self.values['close'] <= self.lastPrice)):
+                self.nbReinvest = 0
+                self.lastPrice = self.values['close']
+                self.averagePrice = self.lastPrice
+                self.sens = None
+                self.invest = self.startInvest
+                dest = 'sell ' + self.symbol + ' ' + str(self.volume - (self.invest / self.values['close']))
+                self.volume = (self.invest / self.values['close']) * self.fees
+                return (dest)
+
+        if (self.sens is 'DOWN'):
+            if (self.values['close'] <= self.lastPrice * (1 - self.reinvest) and self.nbReinvest < self.nbReinvestMax):
+                self.nbReinvest += 1
+                self.invest *= 2
+                self.averagePrice = (self.averagePrice * self.volume + (self.values['close'] * (self.invest / self.values['close']))) / (self.volume + (self.invest / self.values['close']))
+                self.lastPrice = self.values['close']
+                dest = 'buy ' + self.symbol + ' ' + str(self.invest / self.values['close'])
+                self.volume += (self.invest / self.values['close']) * self.fees
+                return (dest)
+
+#            if (self.values['close'] <= self.lastPrice * (1 - self.reinvest) and self.nbReinvest >= self.nbReinvestMax):
+#                self.nbReinvest = 0
+#                self.lastPrice = self.values['close']
+#                self.averagePrice = self.values['close']
+#                self.sens = None
+#                self.invest = 0
+#                self.liquidate = 1
+#                self.benef += self.volume * self.values['close']
+#                return ('sell ' + self.symbol + ' ' + str(self.volume))
+
+            if (self.values['close'] >= self.averagePrice * (1 + self.profit)):
+                self.nbReinvest = 0
+                self.lastPrice = self.values['close']
+                self.averagePrice = self.values['close']
+                self.sens = None
+                self.invest = self.startInvest
+                dest = 'sell ' + self.symbol + ' ' + str(self.volume - (self.startInvest / self.values['close']))
+                self.volume = (self.startInvest / self.values['close']) * self.fees
+                return (dest)
+
+        if (self.sens is None):
+            if (self.values['close'] >= self.lastPrice * (1 + self.reinvest) and self.volume - (self.invest / self.values['close']) > 0):
+                self.nbReinvest = 0
+                self.invest = self.startInvest
+                self.lastPrice = self.values['close']
+                self.averagePrice = self.values['close']
+                dest = 'sell ' + self.symbol + ' ' + str(self.volume - (self.invest / self.values['close']))
+                self.volume = self.volume - self.startInvest / self.values['close']
+                return (dest)
+#                self.sens = 'UP'
+#                self.nbReinvest += 1
+#                self.averagePrice = (self.averagePrice * self.volume + self.values['close'] * ((self.invest * 2) / self.values['close'])) / (self.volume + ((self.invest * 2) / self.values['close']))
+#                self.lastPrice = self.values['close']
+#                self.invest *= 2
+#                dest = 'buy ' + self.symbol + ' ' + str(self.invest / self.values['close'])
+#                self.volume += (self.invest / self.values['close']) * self.fees
+#                self.benef -= self.invest
+#                print('hausse buy: ', (self.invest / self.values['close']) * self.fees, ' at: ', self.lastPrice, ' = ', ((self.invest / self.values['close']) * self.fees) * self.lastPrice, file=sys.stderr)
+#                print('nbreinvesmax = ', self.nbReinvestMax, 'reinv = ', self.reinvest, 'self.profit = ', self.profit, file = sys.stderr)
+#                return (dest)
+
+            if (self.values['close'] <= self.lastPrice * (1 - self.reinvest)):
+                self.sens = 'DOWN'
+                self.nbReinvest += 1
+                self.invest *= 2
+                self.averagePrice = (self.averagePrice * self.volume + (self.values['close'] * (self.invest / self.values['close']))) / (self.volume + (self.invest / self.values['close']))
+                self.lastPrice = self.values['close']
+                dest = 'buy ' + self.symbol + ' ' + str(self.invest / self.values['close'])
+                self.volume += (self.invest / self.values['close']) * self.fees
+                return (dest)
+
+        return ('no_moves')
+
+    def logic(self):
+        if (self.liquidate == 1):
+            return ('no_moves')
+        if (self.invest == 0):
+            return (self.firstOrder())
+        return (self.checkOrder())
+
+    def check_price(self, wallet):
+        if ((self.moy / self.volatility[2] - self.min) / 4 >= self.values['close'] - self.min and self.volume_bis == 0):
+            self.volume_bis = wallet / self.values['close']
+            return ('buy ' + self.symbol + ' ' + str(self.volume_bis))
+        if ((self.max - self.moy / self.volatility[2]) / 2 >= self.max - self.values['close'] and self.volume_bis != 0):
+            dest = 'sell ' + self.symbol + ' ' + str(self.volume_bis * self.fees)
+            self.volume_bis = 0
+            return (dest)
+        return ('no_moves')
+
+    def parseInfos(self, values):
+        for j in range(1, len(values)):
+            self.values[self.infos[j]] = tryGetFloat(values[j])
+
+    def listen_market(self):
+        if (self.min is None or self.min > self.values['low']):
+            self.min = self.values['low']
+        if (self.max is None or self.max < self.values['high']):
+            self.max = self.values['high']
+        if (self.volatility[1] is not None):
+            self.volatility[0] += abs(self.values['close'] - self.volatility[1])
+        self.volatility[1] = self.values['close']
+        self.volatility[2] += 1
+        self.moy += self.values['close']
+        x = (self.moy / self.volatility[2]) / 100
+        if (self.volatility[2] > 10):
+            if (self.volatility[3] == 0):
+                self.nbReinvestMax = int(20 / (self.volatility[0] / self.volatility[2])) - 1
+                if (self.nbReinvestMax <= 3):
+                    self.nbReinvestMax = 3
+            self.reinvest = 1.2 / (self.min / x)
+            self.profit = 1.8 / (self.max / x)
+#        print(self.nbReinvestMax, self.reinvest, self.profit, file = sys.stderr)
+
+def placeTrades(trades):
+    if ('no_moves' in trades):
+        trades.remove('no_moves')
+    if (len(trades) == 0):
+        print('no_moves')
+        return
+    str = trades[0]
+    for i in range(1, len(trades)):
+        str += ';'
+        str += trades[i]
+    print(str)
+
+def tradeLoop(infos, values):
+    usdt_eth = Strat('USDT_ETH', 0.02, 0.01, (infos[1] * 3) / 4, infos[2], infos[0])
+    strats = [usdt_eth]
+    while (1):
+        trades = []
+        if (values[0] == 'update' and values[1] == 'game' and values[2] == 'next_candles'):
+            tab = values[3].split(';')
+            for i in range(0, len(tab)):
+                for x in strats:
+                    if (x.symbol in tab[i]):
+                        x.parseInfos(tab[i].split(','))
+                        x.listen_market()
+        if (values[0] == 'action' and values[1] == 'order'):
+            for x in strats:
+                trades.append(x.logic())
+                if (trades[0] == 'no_moves'):
+                    trades[0] = x.check_price(infos[1] / 4)
+            placeTrades(trades)
+        values = input().split(' ')
+
+def tryGetInt(value):
+    try:
+        value = int(value)
+    except(ValueError):
+        print("Not an integer", file=sys.stderr)
+        exit(84)
+    return (value)
+
+def tryGetFloat(value):
+    try:
+        value = float(value)
+    except(ValueError):
+        print("Not a float", file=sys.stderr)
+        exit(84)
+    return (value)
+
+def parse_arguments():
+    infos = [None, 10000, 0.002]
+    tab = input().split(' ')
+    while (tab[0] == "settings"):
+        if (tab[1] == "initial_stack"):
+            infos[1] = tryGetInt(tab[2])
+        if (tab[1] == "transaction_fee_percent"):
+            infos[2] = tryGetFloat(tab[2])
+        if (tab[1] == "candle_format"):
+            infos[0] = tab[2].split(',')
+        tab = input().split(' ')
+    infos.append(tab)
+    if (infos[0] is None):
+        exit(84)
+    return (infos)
+
+def main():
+    tab = parse_arguments()
+    tradeLoop(tab[:3], tab[3])
+
+if (__name__ == "__main__"):
+    main()
