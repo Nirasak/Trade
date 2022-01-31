@@ -16,5 +16,4 @@ on it. You are one of them.
 You have to create a trading bot that will bring about a revolution of the trade markets.
 
 The program ai-bot-workspace is the tool you’ll use to test your Trade project.
-Here’s a short guide to get you started.
 Download ai-bot-workspace v2.4.3 from GitHub.
